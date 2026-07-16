@@ -118,24 +118,29 @@ Every run's exact command, hyperparameters, and epoch-by-epoch accuracy is saved
 `experiments/<mode>_<model_names>/<timestamp>/train_log.txt` and committed to git (checkpoints
 too — tiny, ~2.7MB total) as verifiable proof of every experiment actually run.
 
-## Phase 7 — RAT Selection / Validation Stage (your novel contribution)
-- [ ] Define the inference contract: given a live network-state vector (whatever RAT(s) it has sensors for),
-      run it through the trained branch(es) and produce a **recommendation of which RAT to select/handover to**
-      — not just a KPI class.
-- [ ] Design options to decide between (flag for supervisor input):
-  1. **Rule-based on predicted KPI**: run the same state through each RAT's trained head (if features are
-     available/estimable for each), compare predicted class/expected throughput, recommend the argmax.
-  2. **Learned meta-head**: a small classifier trained on top of the ensemble's outputs whose target label
-     is "which RAT historically performed best in this state" — needs a derived ground-truth for "best RAT
-     per row" from the dataset (e.g. compare `DL_bitrate` across co-located `NetworkTech` samples).
-- [ ] Implement `infer.py`: load trained checkpoints, accept a new sample, output the recommended RAT +
-      confidence.
-- [ ] Validate against a held-out slice: does the recommended RAT actually match/beat the RAT that was
-      really in use for that sample (using `NetworkTech` as ground truth of what was actually selected)?
+## Phase 7 — RAT Selection / Validation Stage (your novel contribution) — DONE, honest negative result
+- [x] Defined the inference contract: rule-based (plan's Option 1) — run the shared state through
+      both trained branches, recommend whichever predicts the better expected KPI outcome.
+      Learned-meta-head (Option 2) not pursued — the rule-based approach's result (below) shows the
+      bottleneck isn't the recommendation mechanism, it's the underlying branches' lack of real
+      differentiation (per Phase 6), which a meta-head wouldn't fix either.
+- [x] `src/infer.py` implemented: loads checkpoints, evaluates on the true held-out **test** split
+      (previously used an arbitrary slice — fixed), reports a majority-class baseline for context.
+- [x] Validated against held-out data. **Found and fixed a confound first:** `is_5G` is a trained
+      feature, so both branches could see a row's actual serving tech directly rather than reasoning
+      independently — fixed by overriding `is_5G` to each branch's own native value before scoring.
+      **Honest result after the fix: ~58-59% agreement, roughly at/below the 62.7% majority-class
+      baseline** — the recommender isn't adding value. This directly reflects Phase 6's finding of
+      no real capacity/behavior differentiation between the two branches: with nearly-identical
+      branches, there's little independent signal for a recommender to exploit. Documented as a
+      genuine limitation for the discussion chapter, not an implementation bug.
 
 ## Phase 8 — Write-up
-- [ ] Map each phase's results into thesis chapters: Background (paper), Methodology (Phases 1-5), Results
-      (Phase 6), Contribution/Discussion (Phase 7), Limitations & Future Work (7G scalability, per your slides).
+- [x] First draft written: `docs/notes/writeup.md` — Background, Methodology, Results (§3.1-3.3),
+      Contribution (Phase 7 recommender), Limitations, Future Work, Summary. Pulled from
+      `progress_log.md`'s full experiment trail, reorganized by argument rather than chronology.
+- [ ] Review/rewrite in your own voice for actual thesis submission; the draft is a solid starting
+      point, not final prose.
 
 ---
 

@@ -5,9 +5,10 @@ Distillation via Collaborative Learning** (CVPR 2020) from image classifiers to 
 RAT agents (4G/5G), trained collaboratively on real drive-test telemetry, with a downstream RAT-selection
 recommendation stage.
 
-See [plan.md](plan.md) for the full phased roadmap and
+See [plan.md](plan.md) for the full phased roadmap,
 [docs/notes/progress_log.md](docs/notes/progress_log.md) for the running log of what's been done,
-findings, and decisions made along the way (updated as each phase progresses).
+findings, and decisions made along the way, and
+[docs/notes/writeup.md](docs/notes/writeup.md) for the thesis-chapter-structured write-up (Phase 8).
 
 ## Layout
 - `src/` — data pipeline, distortions, models, KDCL ensemble methods, training/inference (this project's code)
@@ -15,8 +16,8 @@ findings, and decisions made along the way (updated as each phase progresses).
 - `data/raw/` — source dataset (`urban_dataset_processed.xlsx`)
 - `data/processed/` — generated splits/caches (gitignored except this placeholder)
 - `docs/paper/` — the KDCL CVPR 2020 paper
-- `docs/notes/` — derivation notes + `progress_log.md`, the running project log
-- `experiments/` — run configs and results (gitignored except this placeholder)
+- `docs/notes/` — derivation notes, `progress_log.md` (running log), `writeup.md` (thesis-structured draft)
+- `experiments/` — run configs and results, tracked in git (per-run `train_log.txt` + checkpoints as evidence)
 - `notebooks/` — exploratory data analysis
 
 ## Setup

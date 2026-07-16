@@ -330,6 +330,53 @@ threatens strong model" story, which needs a real capacity gap this dataset does
 the architectures tried. **Proceeding to Phase 7** (RAT-selection inference stage) with this as the
 final, honestly-documented Phase 6 conclusion.
 
+## Phase 7 — RAT-Selection Inference Stage
+
+`src/infer.py`: rule-based recommender (plan.md's Option 1) — run a shared state vector through
+both trained branches, recommend whichever predicts the better expected KPI outcome. Fixed it to
+evaluate on the true held-out **test** split (`time_blocked_split`'s third slice, never touched by
+training or hyperparameter tuning) rather than an arbitrary slice of the full dataframe, and added
+a majority-class baseline for context (a naive "always recommend the more common RAT" comparison).
+
+**First run, using the KDCL-trained checkpoints (T=1.0, alpha=0.2, ICL on, normalized):**
+```
+Test set size: 3403
+Agreement with actual NetworkTech in use: 2052/3403 = 60.3%
+Majority-class baseline (always recommend '5G'): 62.7%
+Agreement on rows that actually achieved the top load class: 597/747 = 79.9%
+```
+
+**Confound found before trusting this:** `is_5G` is one of the 40 trained features, so a row's
+actual serving tech is baked directly into its input. Both branches see the *same* row, including
+its real `is_5G` value — so "asking the 5G_agent" about a row that was actually served by 4G isn't
+a genuine counterfactual, it's just handing the 5G_agent a row whose features say "this is 4G" and
+watching it (correctly) predict accordingly. This isn't a fair independent comparison.
+
+**Fix:** `recommend_rat` now overrides `is_5G` to each branch's *own* native value (0 for 4G_agent,
+1 for 5G_agent, computed in the normalized/scaled space via `normalized_is_5g_values`) before
+scoring, regardless of what the row's real tech was. This is what "what would my tech's model think
+of this state" actually requires.
+
+**Re-run with the fix:**
+```
+Test set size: 3403
+Agreement with actual NetworkTech in use: 1992/3403 = 58.5%
+Majority-class baseline: 62.7%
+Agreement on rows that actually achieved the top load class: 443/747 = 59.3%
+```
+
+**Honest conclusion: once the confound is removed, the recommender performs roughly at
+chance/baseline level** — the earlier 79.9% figure was substantially inflated by the model reading
+off the actual tech identity rather than reasoning independently. This is consistent with, and
+directly explained by, the Phase 6 finding that there's no real capacity/performance differentiation
+between the two trained branches on this task: if 4G_agent and 5G_agent behave nearly identically
+as functions, forcing each to imagine "if I were this row's tech" naturally produces little
+differentiated signal between them. **This is a genuine limitation to report, not an implementation
+bug** — a good discussion point: a meaningfully useful RAT recommender likely needs either (a) two
+branches with real, non-overfit capacity/behavior differences (which Phase 6 showed this dataset
+doesn't support with MLP-style architectures), or (b) a task where RAT choice actually matters more
+than it appears to for this label design.
+
 ### Log
 - **2026-07-14 → 15:** Confirmed real RAT split (4G/5G only), refactored `data.py`/`train.py` to
   share instances across branches (fixed initial design bug), built full `src/` pipeline.
@@ -377,3 +424,12 @@ final, honestly-documented Phase 6 conclusion.
   and the 150-epoch run's train/val loss curves showed the large model overfitting, not
   undertraining. Concluded this dataset/architecture combination doesn't support a fair capacity
   gap; stopped chasing it. **Phase 6 is done.** Moving to Phase 7 (RAT-selection inference stage).
+- **2026-07-16 (Phase 7):** Fixed `infer.py` to evaluate on the true held-out test split (was using
+  an arbitrary df slice) and added a majority-baseline comparison. First run looked promising
+  (79.9% agreement on rows that actually hit the top load class) but found a confound: `is_5G` is a
+  trained feature, so both branches could see the row's real serving tech directly rather than
+  reasoning independently. Fixed by overriding `is_5G` to each branch's own native value before
+  scoring. Re-run dropped to 59.3% — roughly chance/baseline level. Honest conclusion: this
+  directly reflects Phase 6's finding of no real capacity/behavior differentiation between the two
+  branches — documented as a genuine limitation, not a bug. **Phase 7's rule-based recommender is
+  implemented and evaluated; the result is an honest negative, consistent with Phase 6.**
