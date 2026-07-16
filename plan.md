@@ -84,18 +84,29 @@ Source materials already in the folder that this plan is built from:
 - [x] Loop refactored: per-branch forward, shared teacher logit via `kdcl.py`, per-branch backward,
       `MultiViewDataset` dataloaders. Supports `--mode {vanilla, dml, kdcl}`.
 - [x] Smoke-tested end to end (2-epoch runs) — confirms the pipeline runs correctly, not a real result.
-- [x] Ran the 3-way comparison, 50 epochs each: vanilla (73.85%/78.20%), DML (64.85%/64.83% —
-      reproduces the paper's negative-transfer failure), KDCL-MinLogit (64.80%/68.44% — clearly
-      beats DML, does not yet beat vanilla). `T`/`alpha` tuning needed next — see Phase 6.
+- [x] Ran the 3-way comparison. **Note: first-pass numbers below were superseded once feature
+      normalization was added in Phase 6 — see that section for the corrected comparison.**
 
-## Phase 6 — Evaluation
+## Phase 6 — Evaluation — normalization fix + revised finding (see docs/notes/progress_log.md for full detail)
+- [x] Hyperparameter sweep: `src/sweep.py`, 12-combo grid over `T`x`alpha`. Found `alpha=0.2` beats
+      the CIFAR-inherited default `0.5` at every temperature. Used T=1.0/alpha=0.2 going forward.
+- [x] Added z-score feature normalization (`fit_scaler` in `src/data.py`, fit on train split only).
+      **This was the real lever, not the distillation method choice:** vanilla jumped from
+      73.85%/78.20% (unnormalized) to 91.15%/89.48% (normalized).
+- [x] Re-ran vanilla/DML/KDCL(ICL on)/KDCL(ICL off) with normalization, 50 epochs each:
+      vanilla 91.15%/89.48%, **dml 91.86%/90.71% (best)**, kdcl-ICL-on 91.39%/89.66%,
+      kdcl-ICL-off 91.13%/90.51%. **Revised conclusion: DML no longer fails and edges out KDCL for
+      both branches** — contradicts the earlier (unnormalized) headline result. Diagnosis: DML's
+      failure mode needs a real capacity/performance gap between students, and normalization nearly
+      closed the gap between our small/large MLP pairing on this comparatively easy 3-class task.
+- [x] Ablation (ICL on/off) and robustness test re-run with normalization: robustness test now
+      behaves sensibly (monotonic degradation, not flat), but shows no clear KDCL/ICL advantage over
+      vanilla either — consistent with the capacity-gap diagnosis above.
+- [ ] **Next decision: deliberately widen the capacity gap** between the two branches (e.g. a much
+      smaller "weak" model for one branch) so vanilla training actually produces a sizeable accuracy
+      gap, recreating the conditions the paper's method is designed for — needed before a fair
+      verdict on whether KDCL beats DML on this dataset.
 - [ ] Per-RAT accuracy/F1/confusion matrix, vanilla vs DML vs KDCL.
-- [ ] Ablation: with/without the distortion (ICL) step — expect a small but real accuracy drop when disabled,
-      mirroring the paper's ~0.5% finding.
-- [ ] Robustness test: inject increasing noise (larger AWGN variance) into the validation set and plot
-      accuracy/loss degradation for KDCL vs vanilla vs DML (mirrors the paper's Figure 4).
-- [ ] Hyperparameter sweep: temperature `T` and loss weight `λ` (start from the paper's stable range 0.2–5,
-      default λ=1).
 
 ## Phase 7 — RAT Selection / Validation Stage (your novel contribution)
 - [ ] Define the inference contract: given a live network-state vector (whatever RAT(s) it has sensors for),

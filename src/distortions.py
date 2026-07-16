@@ -39,8 +39,19 @@ class DelayJitterDistortion:
         return x * mask.astype(np.float32)
 
 
+class NoDistortion:
+    """Identity -- used for the ICL ablation (both branches see the clean, undistorted row)."""
+
+    def __init__(self, seed: int = 0):
+        pass
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+        return x
+
+
 DISTORTION_REGISTRY = {
     "awgn": AWGNDistortion,
     "fading": RayleighFadingDistortion,
     "delay": DelayJitterDistortion,
+    "none": NoDistortion,
 }

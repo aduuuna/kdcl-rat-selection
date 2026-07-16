@@ -40,6 +40,17 @@ def numeric_feature_columns(df: pd.DataFrame) -> list:
     return [c for c in numeric_cols if c not in excluded]
 
 
+def fit_scaler(df: pd.DataFrame, feature_cols: list):
+    """Mean/std from training data only -- avoids leaking val/test statistics. Distortion
+    magnitudes (src/distortions.py) are calibrated assuming features arrive in this normalized
+    space, so this must run before distortions are applied, not after."""
+    values = df[feature_cols].fillna(0.0).to_numpy(dtype=np.float32)
+    mean = values.mean(axis=0)
+    std = values.std(axis=0)
+    std[std == 0] = 1.0
+    return mean, std
+
+
 def split_by_rat(df: pd.DataFrame) -> dict:
     """EDA only -- not used for training splits, both branches train on the full dataset."""
     return {rat: df[df["NetworkTech"] == rat].reset_index(drop=True) for rat in ("4G", "5G")}
@@ -61,8 +72,12 @@ def time_blocked_split(df: pd.DataFrame, val_frac: float = 0.15, test_frac: floa
 class MultiViewDataset(Dataset):
     """Each branch gets the same row through its own distortion, so one shared teacher logit is valid."""
 
-    def __init__(self, df: pd.DataFrame, feature_cols: list, label: pd.Series, distortions: list):
-        self.features = df[feature_cols].fillna(0.0).to_numpy(dtype=np.float32)
+    def __init__(self, df: pd.DataFrame, feature_cols: list, label: pd.Series, distortions: list, scaler=None):
+        features = df[feature_cols].fillna(0.0).to_numpy(dtype=np.float32)
+        if scaler is not None:
+            mean, std = scaler
+            features = (features - mean) / std
+        self.features = features
         self.labels = label.to_numpy(dtype=np.int64)
         self.distortions = distortions
 
@@ -78,8 +93,12 @@ class MultiViewDataset(Dataset):
 class SingleViewDataset(Dataset):
     """No distortion -- used for validation/inference."""
 
-    def __init__(self, df: pd.DataFrame, feature_cols: list, label: pd.Series = None):
-        self.features = df[feature_cols].fillna(0.0).to_numpy(dtype=np.float32)
+    def __init__(self, df: pd.DataFrame, feature_cols: list, label: pd.Series = None, scaler=None):
+        features = df[feature_cols].fillna(0.0).to_numpy(dtype=np.float32)
+        if scaler is not None:
+            mean, std = scaler
+            features = (features - mean) / std
+        self.features = features
         self.labels = label.to_numpy(dtype=np.int64) if label is not None else None
 
     def __len__(self):

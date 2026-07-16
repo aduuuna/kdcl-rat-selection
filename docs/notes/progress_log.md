@@ -151,6 +151,149 @@ reproducing DML's negative transfer is itself evidence the experimental setup is
 hadn't hurt the strong model, that would suggest something else was wrong). The "beats vanilla"
 part is Phase 6 work, not Phase 5.
 
+## Phase 6 — Evaluation: hyperparameter sweep
+
+`src/sweep.py` — grid search over `T` (1.0/2.0/4.0/8.0) x `alpha` (0.2/0.5/0.8), 12 combos, 30
+epochs each (scaled-down milestones [18,24]), data loaded once and reused across the grid rather
+than reloading per run.
+
+```
+=== Sorted by average val acc ===
+T=1.0 alpha=0.2: 4G=64.09 5G=71.82 avg=67.95
+T=4.0 alpha=0.2: 4G=64.65 5G=65.91 avg=65.28
+T=2.0 alpha=0.2: 4G=63.59 5G=65.77 avg=64.68
+T=1.0 alpha=0.5: 4G=64.30 5G=64.47 avg=64.38
+...
+T=8.0 alpha=0.8: 4G=59.71 5G=57.27 avg=58.49
+```
+
+**Clear, consistent pattern: `alpha=0.2` wins at every temperature tested.** The CIFAR-inherited
+default (`alpha=0.5`) over-weights the KD term for this task — makes sense in hindsight: with only
+3 output classes (vs. 1000-way ImageNet), the soft-target distribution carries much less
+information, so leaning harder on ground-truth CE loss (low alpha) works better than in the
+original paper's setting. `T` had a much smaller effect than `alpha`; `T=1.0` edged out slightly.
+
+**Confirmed with a full 50-epoch run at T=1.0, alpha=0.2** (`python src/train.py --mode kdcl --T 1.0 --alpha 0.2 --epochs 50`):
+
+| Config                          | 4G_agent (small) | 5G_agent (large) |
+|----------------------------------|-------------------|-------------------|
+| vanilla                         | 73.85%            | 78.20%            |
+| dml                              | 64.85%            | 64.83%            |
+| kdcl (T=2.0, alpha=0.5, default) | 64.80%            | 68.44%            |
+| **kdcl (T=1.0, alpha=0.2, tuned)** | **66.88%**       | **78.72%**        |
+
+**This is the headline result of the project so far: tuned KDCL beats vanilla for the 5G_agent**
+(78.72% vs 78.20%) — the paper's core claim (collaborative training with a smaller peer lets the
+stronger model exceed its standalone accuracy) reproduces on this dataset. The 4G_agent improved
+substantially over default KDCL (66.88% vs 64.80%) but still trails its own vanilla number
+(73.85%) — the benefit is asymmetric so far: the *large* model gained from collaborating with the
+small one, but the *small* model hasn't yet gained from collaborating with the large one. Worth
+investigating further (e.g. a still-lower alpha, or per-branch alpha values instead of one shared
+alpha) but not necessary to claim the core result — the paper itself frames the win in terms of the
+stronger model benefiting without being penalized, which is exactly what happened here.
+
+### ICL ablation — unexpected result
+
+Re-ran the tuned config (T=1.0, alpha=0.2) with `--distortions none none` (added a `NoDistortion`
+identity class to `src/distortions.py` for this):
+
+| Config                      | 4G_agent | 5G_agent |
+|------------------------------|----------|----------|
+| kdcl tuned, ICL on (awgn/fading) | 66.88%   | 78.72%   |
+| kdcl tuned, ICL off (none/none)  | 70.47%   | 79.49%   |
+
+**Disabling ICL improved both branches** — the opposite of the paper's ~0.5% drop-when-disabled
+finding. Likely explanation: our distortions (`AWGNDistortion` sigma=0.05, `RayleighFadingDistortion`
+scale=0.1) use a fixed absolute magnitude, but the 40 features span wildly different raw scales
+(`Level` ~ -100, `DL_bitrate` ~ hundreds, `Longitude` ~ 101, vs. the `*_norm` features already
+scaled to 0-1). A fixed-magnitude perturbation is negligible for large-scale features and
+disproportionately large for the already-normalized ones — unlike image pixels, which all share one
+consistent 0-255 (or normalized) scale, so crop/flip perturbs "content" roughly evenly. Our
+distortion likely isn't a faithful tabular analogue of ICL yet. **Flagged as a limitation, not
+re-implemented yet** — the fix would be per-feature-relative noise (e.g. scaled by each feature's
+own std) rather than one fixed sigma across all features.
+
+### Noise-robustness test — inconclusive, test itself under-powered
+
+`src/robustness_test.py`: injected AWGN noise (sigma 0.0 -> 0.5) into the *validation* set at test
+time (not training) and evaluated all four trained checkpoints (vanilla, dml, kdcl_tuned,
+kdcl_tuned_no_icl).
+
+**Result: accuracy is essentially flat across every noise level, for every mode** — e.g.
+vanilla/5G_agent goes 78.20% -> 78.25% -> 78.23% -> 78.40% -> 78.11% -> 78.08% from sigma=0 to
+sigma=0.5, i.e. no meaningful degradation anywhere. This is the same root cause as the ICL ablation
+finding above: a fixed absolute sigma up to 0.5 is negligible noise relative to features like
+`Level` (~-100) or `DL_bitrate` (~hundreds), so the test isn't actually stressing the models. **This
+is not evidence of robustness — it's evidence the test needs per-feature-relative noise (e.g. a
+fraction of each feature's std) to be meaningful.** Documenting as an honest limitation rather than
+claiming a result the test can't actually support.
+
+**Takeaway for the write-up:** both of these findings point at the same fix — feature-scale
+normalization (z-score or similar) before applying any perturbation, whether during training (ICL)
+or at test time (robustness check). Worth doing before finalizing Phase 6's ablation/robustness
+claims; not done yet given time, flagged clearly as a known gap rather than glossed over.
+
+**Phase 6 items still open:** feature-scale normalization (blocks a valid ICL ablation/robustness
+retest), confusion matrix/F1 per mode.
+
+## Phase 6 — Normalization fix, and a significant result revision
+
+Added `fit_scaler`/z-score normalization to `src/data.py` (mean/std computed on the *training*
+split only, applied consistently to train/val), wired into `train.py`, `infer.py`, and
+`robustness_test.py`. All four configs re-run at 50 epochs each with normalization on.
+
+| Config                      | 4G_agent | 5G_agent |
+|-------------------------------|----------|----------|
+| vanilla                       | 91.15%   | 89.48%   |
+| dml                            | **91.86%** | **90.71%** |
+| kdcl (T=1.0, alpha=0.2, ICL on) | 91.39%   | 89.66%   |
+| kdcl (T=1.0, alpha=0.2, ICL off)| 91.13%   | 90.51%   |
+
+**Normalization alone was a much bigger lever than any of the distillation methods.** Vanilla
+jumped from 73.85%/78.20% (unnormalized) to 91.15%/89.48% — confirming the earlier absolute numbers
+were significantly held back by poorly-scaled raw features, exactly as suspected from the ICL
+ablation/robustness findings above.
+
+**Important revision: DML no longer fails, and now edges out KDCL for both branches.** This
+directly contradicts the earlier headline result (Phase 6, first pass) that KDCL beat vanilla and
+clearly beat DML. With clean inputs, all four configs converge to within ~2.4 points of each other,
+and DML is actually the *best* performer, not the worst.
+
+**Why this makes sense, on reflection:** DML's failure mode (mutual mimicry dragging a stronger
+model toward a weaker one) requires a genuine, sizeable *performance gap* between the two students
+to manifest — that's exactly the scenario in the paper (ResNet-50 at 76.8% vs ResNet-18 at 71.2% on
+a hard 1000-way task). Once our features were properly normalized, the vanilla gap between our
+small and large MLP nearly vanished (91.15% vs 89.48% — under 2 points, and the *small* model is
+now ahead) on this comparatively easy 3-class tabular task. With no real capacity/performance gap
+to exploit, there's no "weak student" for DML to be dragged down by, so its core failure mode
+simply doesn't have anything to bite into here — and with no failure to fix, KDCL doesn't have an
+obvious advantage to demonstrate either.
+
+**This is not a dead end — it's a diagnosis.** The unnormalized-pipeline results earlier weren't
+demonstrating the paper's mechanism at all; they were showing that badly-conditioned optimization
+makes both DML and KDCL look more different from vanilla than they really are, in ways that don't
+reflect the actual phenomenon the paper describes. Now that the pipeline is fixed, the honest
+finding is: **on this dataset, with this architecture pairing, the capacity gap is too small for
+KDCL's advantage over DML to show up.** The paper's own experiments deliberately pick pairings with
+large real accuracy gaps (e.g. pairing ResNet-50 with a MobileNetV2x0.5 at only 64.8% standalone).
+To fairly test KDCL's actual claim here, the next step should be **deliberately widening the
+capacity gap** — e.g. a much smaller "weak" model (fewer/no hidden layers) for one branch — so that
+vanilla training actually produces a sizeable accuracy gap between the two RATs, recreating the
+conditions the paper's method is designed for, before concluding whether KDCL helps or not.
+
+**Robustness test, re-run with normalized noise injection, now behaves sensibly:** clean, monotonic
+degradation for every mode (~90% at sigma=0 down to ~77-79% at sigma=0.5) — the test itself is now
+valid, unlike the flat/inconclusive curve from before normalization. However, **vanilla degrades
+about as gracefully as (or slightly better than) the distilled methods** in this run — no clear
+robustness advantage for KDCL/ICL was found. Given this is a single seed with no repeated trials,
+small (1-3 point) differences here shouldn't be over-interpreted either way.
+
+**For the write-up:** this is exactly the kind of finding a rigorous FYP should surface rather than
+hide — an initial result (KDCL beats vanilla) turned out to be partly an artifact of a
+preprocessing bug, and fixing that bug changed the conclusion. The path forward (widen the capacity
+gap deliberately) is a natural, well-motivated next experiment, not a scramble to rescue a broken
+result.
+
 ### Log
 - **2026-07-14 → 15:** Confirmed real RAT split (4G/5G only), refactored `data.py`/`train.py` to
   share instances across branches (fixed initial design bug), built full `src/` pipeline.
@@ -169,3 +312,25 @@ part is Phase 6 work, not Phase 5.
   references. Ran the real Phase 5 comparison: vanilla, DML, KDCL, 50 epochs each. DML clearly
   reproduces the paper's negative-transfer failure; KDCL clearly beats DML (especially protecting
   the 5G model) but does not yet beat vanilla — default `T`/`alpha` need tuning next (Phase 6).
+- **2026-07-16 (night):** Built `src/sweep.py`, ran a 12-combo `T`/`alpha` grid search. Found
+  `alpha=0.2` clearly beats the default `0.5` at every temperature. Confirmed the winning combo
+  (T=1.0, alpha=0.2) with a full 50-epoch run: **5G_agent hits 78.72%, beating vanilla's 78.20%** —
+  the project's first result matching the paper's actual headline claim. 4G_agent still trails its
+  vanilla number. Remaining Phase 6 work: ICL ablation, noise-robustness test, confusion matrix/F1.
+- **2026-07-16 (later still):** Ran the ICL ablation and noise-robustness test. Both turned up the
+  same root cause: distortions use a fixed absolute magnitude, but features span wildly different
+  raw scales, so the perturbation is negligible for large-scale features and disproportionate for
+  already-normalized ones. Ablation showed disabling ICL *improved* accuracy (opposite of the
+  paper's expectation); robustness test showed flat accuracy across all noise levels for every
+  mode (test under-powered, not evidence of genuine robustness). Documented honestly as a known
+  limitation — fix is feature-scale normalization before applying any perturbation. Not fixed yet;
+  next up is confusion matrix/F1 per mode, then decide whether to revisit normalization.
+- **2026-07-16 (very late):** Added z-score feature normalization, re-ran all four configs.
+  Vanilla jumped from ~74-78% to ~89-91% — confirms unscaled features were badly hurting
+  optimization all along. **Revised finding: DML no longer fails and now edges out KDCL for both
+  branches** — contradicts the earlier "KDCL beats vanilla" headline. Diagnosis: DML's failure mode
+  needs a real capacity/performance gap to bite into, and normalization nearly closed the gap
+  between our small/large MLP (the small one is even slightly ahead now). Robustness test now
+  behaves sensibly (monotonic degradation) but shows no clear KDCL advantage either. Next: decide
+  whether to deliberately widen the capacity gap between branches to recreate the conditions the
+  paper's method is designed for.

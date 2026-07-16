@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 from data import (
     load_raw, make_load_label, numeric_feature_columns,
-    time_blocked_split, MultiViewDataset, N_LOAD_CLASSES, LABEL_COL,
+    time_blocked_split, MultiViewDataset, N_LOAD_CLASSES, LABEL_COL, fit_scaler,
 )
 from distortions import DISTORTION_REGISTRY
 from kdcl import ENSEMBLE_METHODS
@@ -50,10 +50,11 @@ def build_loaders(args):
     feature_cols = numeric_feature_columns(df)
     df[LABEL_COL] = make_load_label(df)
     train_df, val_df, _ = time_blocked_split(df)
+    scaler = fit_scaler(train_df, feature_cols)
 
     distortions = [DISTORTION_REGISTRY[args.distortions[i]](seed=args.seed + i) for i in range(2)]
-    train_ds = MultiViewDataset(train_df, feature_cols, train_df[LABEL_COL], distortions)
-    val_ds = MultiViewDataset(val_df, feature_cols, val_df[LABEL_COL], [lambda x: x, lambda x: x])
+    train_ds = MultiViewDataset(train_df, feature_cols, train_df[LABEL_COL], distortions, scaler=scaler)
+    val_ds = MultiViewDataset(val_df, feature_cols, val_df[LABEL_COL], [lambda x: x, lambda x: x], scaler=scaler)
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)

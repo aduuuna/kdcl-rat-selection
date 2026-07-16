@@ -7,7 +7,10 @@ import argparse
 import torch
 import torch.nn.functional as F
 
-from data import load_raw, make_load_label, numeric_feature_columns, SingleViewDataset, LABEL_COL
+from data import (
+    load_raw, make_load_label, numeric_feature_columns, SingleViewDataset, LABEL_COL,
+    time_blocked_split, fit_scaler,
+)
 from models import build_model
 from train import BRANCH_NAMES, N_LOAD_CLASSES
 
@@ -45,7 +48,9 @@ def main():
     df = load_raw()
     feature_cols = numeric_feature_columns(df)
     df[LABEL_COL] = make_load_label(df)
-    ds = SingleViewDataset(df, feature_cols, df[LABEL_COL])
+    train_df, _, _ = time_blocked_split(df)
+    scaler = fit_scaler(train_df, feature_cols)  # must match the scaler the checkpoints were trained with
+    ds = SingleViewDataset(df, feature_cols, df[LABEL_COL], scaler=scaler)
 
     models = [load_checkpoint(ckpt, name, len(feature_cols))
               for ckpt, name in zip(args.checkpoints, args.model_names)]
