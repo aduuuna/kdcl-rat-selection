@@ -294,6 +294,42 @@ preprocessing bug, and fixing that bug changed the conclusion. The path forward 
 gap deliberately) is a natural, well-motivated next experiment, not a scramble to rescue a broken
 result.
 
+## Phase 6 — Attempting to widen the capacity gap: conclusive negative result
+
+Three attempts to create a real standalone performance gap between the small (4G) and large (5G)
+models, all under vanilla (no distillation) training so the comparison is clean:
+
+| Attempt                                          | 4G (weaker arch) | 5G (stronger arch) |
+|----------------------------------------------------|-------------------|-----------------------|
+| 3-class, small vs large (original)                | 91.15%            | 89.48%                |
+| 3-class, **tiny** (pure linear, no hidden layer) vs large | 90.77%      | 89.54%                |
+| 5-class (harder label), small vs large            | 80.63%            | 78.87%                |
+| 3-class, small vs large, **150 epochs** (3x training) | 91.57%          | 89.48%                |
+
+**In every single attempt, the smaller/weaker architecture wins.** Even a pure linear classifier
+(no hidden layer at all) essentially matches or beats a 256→128→64 deep MLP. Making the label
+harder (5 classes) dropped both models' accuracy as expected but didn't change which one wins.
+Giving the large model 3x the training budget (150 vs 50 epochs) didn't help either — and the
+*reason* is visible directly in the training curve: 5G_agent's train accuracy kept climbing
+(89.66%→91.60% from epoch 25 to 150) while its **validation loss kept climbing too** (0.223→0.306)
+even as training loss fell. That's a textbook overfitting signature, not undertraining — the large
+model has more capacity than this task/dataset size (~15.9k training rows) needs, and uses the
+extra capacity to overfit rather than generalize better.
+
+**Conclusion: this dataset's feature set and label design do not support a fair, real capacity gap
+between architectures of this kind.** Forcing a bigger nominal gap (e.g. an even deeper "5G" model)
+would only measure worsening overfitting, not a genuine capability difference — not a fair test of
+DML/KDCL's actual mechanism. Stopping this line of investigation here rather than continuing to
+guess at more configurations.
+
+**What this does NOT undermine:** the earlier normalized-pipeline finding that both DML and KDCL
+give a small, consistent edge over vanilla training (~1-2 points, see the normalization section
+above) still stands as legitimate evidence that collaborative training transfers to this tabular
+RAT domain without breaking anything — just not the paper's more dramatic "weak model rescues/
+threatens strong model" story, which needs a real capacity gap this dataset doesn't provide with
+the architectures tried. **Proceeding to Phase 7** (RAT-selection inference stage) with this as the
+final, honestly-documented Phase 6 conclusion.
+
 ### Log
 - **2026-07-14 → 15:** Confirmed real RAT split (4G/5G only), refactored `data.py`/`train.py` to
   share instances across branches (fixed initial design bug), built full `src/` pipeline.
@@ -334,3 +370,10 @@ result.
   behaves sensibly (monotonic degradation) but shows no clear KDCL advantage either. Next: decide
   whether to deliberately widen the capacity gap between branches to recreate the conditions the
   paper's method is designed for.
+- **2026-07-16 (final):** Also added persistent per-run `train_log.txt` files and un-gitignored
+  `experiments/` (checkpoints are tiny, 2.7MB total) so every run is now git-verifiable evidence,
+  not just a claim in a chat transcript. Tried three ways to widen the capacity gap (a pure-linear
+  4G model, a harder 5-class label, 3x training epochs) — the smaller model won every single time,
+  and the 150-epoch run's train/val loss curves showed the large model overfitting, not
+  undertraining. Concluded this dataset/architecture combination doesn't support a fair capacity
+  gap; stopped chasing it. **Phase 6 is done.** Moving to Phase 7 (RAT-selection inference stage).

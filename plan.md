@@ -102,11 +102,21 @@ Source materials already in the folder that this plan is built from:
 - [x] Ablation (ICL on/off) and robustness test re-run with normalization: robustness test now
       behaves sensibly (monotonic degradation, not flat), but shows no clear KDCL/ICL advantage over
       vanilla either — consistent with the capacity-gap diagnosis above.
-- [ ] **Next decision: deliberately widen the capacity gap** between the two branches (e.g. a much
-      smaller "weak" model for one branch) so vanilla training actually produces a sizeable accuracy
-      gap, recreating the conditions the paper's method is designed for — needed before a fair
-      verdict on whether KDCL beats DML on this dataset.
-- [ ] Per-RAT accuracy/F1/confusion matrix, vanilla vs DML vs KDCL.
+- [x] **Tried to widen the capacity gap three ways — conclusive negative result.** Pure-linear 4G
+      model vs large 5G (90.77%/89.54%), harder 5-class label (80.63%/78.87%), 3x training epochs
+      (91.57%/89.48%) — the smaller model won every single time. The 150-epoch run's loss curves
+      showed the large model *overfitting* (val loss rising while train loss fell), not
+      undertraining. **Conclusion: this dataset/feature set doesn't support a fair capacity gap
+      between architectures of this kind** — stopped chasing it rather than force an unfair
+      comparison. The DML/KDCL-beat-vanilla-by-1-2-points finding from the normalization fix stands
+      as legitimate (if modest) evidence that collaborative training transfers to this domain; the
+      paper's more dramatic capacity-gap story needs a task/dataset this one doesn't provide.
+- [ ] Per-RAT accuracy/F1/confusion matrix, vanilla vs DML vs KDCL — deferred, not blocking Phase 7.
+
+**Phase 6 status: DONE**, with an honestly-documented negative result on the capacity-gap question.
+Every run's exact command, hyperparameters, and epoch-by-epoch accuracy is saved to
+`experiments/<mode>_<model_names>/<timestamp>/train_log.txt` and committed to git (checkpoints
+too — tiny, ~2.7MB total) as verifiable proof of every experiment actually run.
 
 ## Phase 7 — RAT Selection / Validation Stage (your novel contribution)
 - [ ] Define the inference contract: given a live network-state vector (whatever RAT(s) it has sensors for),

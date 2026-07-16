@@ -42,13 +42,15 @@ def get_args():
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--print_freq", type=int, default=5)
     parser.add_argument("--num_workers", type=int, default=0)
+    parser.add_argument("--n_classes", type=int, default=N_LOAD_CLASSES,
+                         help="quantile bins for the load label -- more classes = harder task")
     return parser.parse_args()
 
 
 def build_loaders(args):
     df = load_raw()
     feature_cols = numeric_feature_columns(df)
-    df[LABEL_COL] = make_load_label(df)
+    df[LABEL_COL] = make_load_label(df, n_classes=args.n_classes)
     train_df, val_df, _ = time_blocked_split(df)
     scaler = fit_scaler(train_df, feature_cols)
 
@@ -140,12 +142,20 @@ def main():
     exp_name = f"{args.mode}_{'_'.join(args.model_names)}"
     exp_path = os.path.join("experiments", exp_name, datetime.now().strftime("%Y-%m-%d-%H-%M"))
     os.makedirs(exp_path, exist_ok=True)
-    print(f"Experiment: {exp_path} (mode={args.mode}, ensemble={args.ensemble})")
+    log_path = os.path.join(exp_path, "train_log.txt")
+
+    def log(msg):
+        print(msg)
+        with open(log_path, "a") as f:
+            f.write(msg + "\n")
+
+    log(f"Experiment: {exp_path} (mode={args.mode}, ensemble={args.ensemble})")
+    log(f"args: {vars(args)}")
 
     train_loader, val_loader, in_dim = build_loaders(args)
     models, optimizers, schedulers = [], [], []
     for name in args.model_names:
-        model = build_model(name, in_dim, N_LOAD_CLASSES)
+        model = build_model(name, in_dim, args.n_classes)
         opt = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
         sched = MultiStepLR(opt, args.milestones, args.gamma)
         models.append(model)
@@ -167,11 +177,11 @@ def main():
 
         if (epoch + 1) % args.print_freq == 0:
             for i, name in enumerate(BRANCH_NAMES):
-                print(f"[{epoch+1}] {name}: train_loss={train_losses[i]:.3f} train_acc={train_acces[i]:.2f} "
-                      f"val_loss={val_losses[i]:.3f} val_acc={val_acces[i]:.2f}")
+                log(f"[{epoch+1}] {name}: train_loss={train_losses[i]:.3f} train_acc={train_acces[i]:.2f} "
+                    f"val_loss={val_losses[i]:.3f} val_acc={val_acces[i]:.2f}")
 
     for i, name in enumerate(BRANCH_NAMES):
-        print(f"{name} best val acc: {best_acc[i]:.2f}")
+        log(f"{name} best val acc: {best_acc[i]:.2f}")
 
 
 if __name__ == "__main__":

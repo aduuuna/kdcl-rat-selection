@@ -25,6 +25,7 @@ def build_model(name: str, in_dim: int, n_classes: int) -> nn.Module:
 
 
 model_dict = {
+    "rat_mlp_tiny": lambda in_dim, n_classes: RATMLP(in_dim, n_classes, hidden=()),  # pure linear, no hidden layer
     "rat_mlp_small": lambda in_dim, n_classes: RATMLP(in_dim, n_classes, hidden=(64, 32)),
     "rat_mlp": lambda in_dim, n_classes: RATMLP(in_dim, n_classes, hidden=(128, 64)),
     "rat_mlp_large": lambda in_dim, n_classes: RATMLP(in_dim, n_classes, hidden=(256, 128, 64)),

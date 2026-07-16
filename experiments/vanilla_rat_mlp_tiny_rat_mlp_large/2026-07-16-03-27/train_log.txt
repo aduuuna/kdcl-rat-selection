@@ -1,0 +1,14 @@
+Experiment: experiments\vanilla_rat_mlp_tiny_rat_mlp_large\2026-07-16-03-27 (mode=vanilla, ensemble=minlogit)
+args: {'mode': 'vanilla', 'ensemble': 'minlogit', 'model_names': ['rat_mlp_tiny', 'rat_mlp_large'], 'distortions': ['awgn', 'fading'], 'T': 2.0, 'alpha': 0.5, 'batch_size': 64, 'epochs': 50, 'lr': 0.001, 'weight_decay': 0.0001, 'milestones': [30, 40], 'gamma': 0.1, 'seed': 1, 'print_freq': 10, 'num_workers': 0}
+[10] 4G_agent: train_loss=0.350 train_acc=88.96 val_loss=0.364 val_acc=90.07
+[10] 5G_agent: train_loss=0.276 train_acc=88.39 val_loss=0.254 val_acc=88.51
+[20] 4G_agent: train_loss=0.288 train_acc=90.68 val_loss=0.304 val_acc=90.51
+[20] 5G_agent: train_loss=0.253 train_acc=89.58 val_loss=0.248 val_acc=88.16
+[30] 4G_agent: train_loss=0.261 train_acc=91.05 val_loss=0.276 val_acc=90.51
+[30] 5G_agent: train_loss=0.248 train_acc=89.76 val_loss=0.268 val_acc=87.98
+[40] 4G_agent: train_loss=0.258 train_acc=91.09 val_loss=0.273 val_acc=90.74
+[40] 5G_agent: train_loss=0.245 train_acc=89.69 val_loss=0.265 val_acc=89.16
+[50] 4G_agent: train_loss=0.257 train_acc=91.24 val_loss=0.273 val_acc=90.77
+[50] 5G_agent: train_loss=0.240 train_acc=89.71 val_loss=0.264 val_acc=87.98
+4G_agent best val acc: 90.77
+5G_agent best val acc: 89.54
