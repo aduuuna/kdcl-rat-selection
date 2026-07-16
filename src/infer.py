@@ -7,7 +7,7 @@ import argparse
 import torch
 import torch.nn.functional as F
 
-from data import load_raw, make_load_label, numeric_feature_columns, SingleViewDataset
+from data import load_raw, make_load_label, numeric_feature_columns, SingleViewDataset, LABEL_COL
 from models import build_model
 from train import BRANCH_NAMES, N_LOAD_CLASSES
 
@@ -38,14 +38,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoints", type=str, nargs=2, required=True,
                          help="paths to best.pth for [4G_agent, 5G_agent]")
-    parser.add_argument("--model_names", type=str, nargs=2, default=["rat_mlp", "rat_mlp"])
+    parser.add_argument("--model_names", type=str, nargs=2, default=["rat_mlp_small", "rat_mlp_large"])
     parser.add_argument("--n_samples", type=int, default=10)
     args = parser.parse_args()
 
     df = load_raw()
-    df["load_class"] = make_load_label(df)
     feature_cols = numeric_feature_columns(df)
-    ds = SingleViewDataset(df, feature_cols, df["load_class"])
+    df[LABEL_COL] = make_load_label(df)
+    ds = SingleViewDataset(df, feature_cols, df[LABEL_COL])
 
     models = [load_checkpoint(ckpt, name, len(feature_cols))
               for ckpt, name in zip(args.checkpoints, args.model_names)]

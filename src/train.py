@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 from data import (
     load_raw, make_load_label, numeric_feature_columns,
-    time_blocked_split, MultiViewDataset, N_LOAD_CLASSES,
+    time_blocked_split, MultiViewDataset, N_LOAD_CLASSES, LABEL_COL,
 )
 from distortions import DISTORTION_REGISTRY
 from kdcl import ENSEMBLE_METHODS
@@ -27,7 +27,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["vanilla", "dml", "kdcl"], default="kdcl")
     parser.add_argument("--ensemble", choices=list(ENSEMBLE_METHODS), default="minlogit")
-    parser.add_argument("--model_names", type=str, nargs=2, default=["rat_mlp", "rat_mlp"],
+    parser.add_argument("--model_names", type=str, nargs=2, default=["rat_mlp_small", "rat_mlp_large"],
                          help="one model name per branch, in the order 4G_agent 5G_agent")
     parser.add_argument("--distortions", type=str, nargs=2, default=["awgn", "fading"],
                          help="one distortion per branch, in the order 4G_agent 5G_agent")
@@ -47,13 +47,13 @@ def get_args():
 
 def build_loaders(args):
     df = load_raw()
-    df["load_class"] = make_load_label(df)
     feature_cols = numeric_feature_columns(df)
+    df[LABEL_COL] = make_load_label(df)
     train_df, val_df, _ = time_blocked_split(df)
 
     distortions = [DISTORTION_REGISTRY[args.distortions[i]](seed=args.seed + i) for i in range(2)]
-    train_ds = MultiViewDataset(train_df, feature_cols, train_df["load_class"], distortions)
-    val_ds = MultiViewDataset(val_df, feature_cols, val_df["load_class"], [lambda x: x, lambda x: x])
+    train_ds = MultiViewDataset(train_df, feature_cols, train_df[LABEL_COL], distortions)
+    val_ds = MultiViewDataset(val_df, feature_cols, val_df[LABEL_COL], [lambda x: x, lambda x: x])
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)

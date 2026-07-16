@@ -15,7 +15,12 @@ NON_FEATURE_COLS = {
     "NARFCN1", "Operatorname", "time_seconds",
 }
 
+# Correlate 0.79 / 0.66 with derived_load and are almost certainly its components
+# (confirmed 2026-07-16 EDA) -- excluded to avoid predicting the label from its own ingredients.
+LEAKY_COLS = {"temp_load", "sig_load"}
+
 LOAD_COL = "derived_load"
+LABEL_COL = "load_class"
 N_LOAD_CLASSES = 3  # Low / Medium / High, quantile-based
 
 
@@ -29,9 +34,10 @@ def make_load_label(df: pd.DataFrame, load_col: str = LOAD_COL, n_classes: int =
     return pd.qcut(df[load_col], q=n_classes, labels=False, duplicates="drop")
 
 
-def numeric_feature_columns(df: pd.DataFrame, exclude_col: str = LOAD_COL) -> list:
+def numeric_feature_columns(df: pd.DataFrame) -> list:
+    excluded = NON_FEATURE_COLS | LEAKY_COLS | {LOAD_COL, LABEL_COL}
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    return [c for c in numeric_cols if c not in NON_FEATURE_COLS and c != exclude_col]
+    return [c for c in numeric_cols if c not in excluded]
 
 
 def split_by_rat(df: pd.DataFrame) -> dict:
@@ -87,7 +93,8 @@ class SingleViewDataset(Dataset):
 
 if __name__ == "__main__":
     df = load_raw()
-    df["load_class"] = make_load_label(df)
-    print("overall", df.shape, "class balance:", df["load_class"].value_counts(normalize=True).to_dict())
+    print("feature columns:", len(numeric_feature_columns(df)))
+    df[LABEL_COL] = make_load_label(df)
+    print("overall", df.shape, "class balance:", df[LABEL_COL].value_counts(normalize=True).to_dict())
     for rat, rat_df in split_by_rat(df).items():
-        print(rat, rat_df.shape, "class balance:", rat_df["load_class"].value_counts(normalize=True).to_dict())
+        print(rat, rat_df.shape, "class balance:", rat_df[LABEL_COL].value_counts(normalize=True).to_dict())
