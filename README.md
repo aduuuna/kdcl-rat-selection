@@ -8,7 +8,9 @@ recommendation stage.
 See [plan.md](plan.md) for the full phased roadmap,
 [docs/notes/progress_log.md](docs/notes/progress_log.md) for the running log of what's been done,
 findings, and decisions made along the way, and
-[docs/notes/writeup.md](docs/notes/writeup.md) for the thesis-chapter-structured write-up (Phase 8).
+[docs/notes/writeup.md](docs/notes/writeup.md) for the thesis-chapter-structured write-up (Phase 8),
+and [docs/notes/explanation.md](docs/notes/explanation.md) for a plain-language walkthrough of the
+whole codebase and what it does.
 
 ## Layout
 - `src/` — data pipeline, distortions, models, KDCL ensemble methods, training/inference (this project's code)
