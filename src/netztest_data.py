@@ -54,8 +54,14 @@ def load_raw(path: str = RAW_CSV, rats: tuple = RATS) -> pd.DataFrame:
     return df
 
 
-def numeric_feature_columns(df: pd.DataFrame) -> list:
+def numeric_feature_columns(df: pd.DataFrame, include_tech_flag: bool = False, rats: tuple = RATS) -> list:
+    """Default (include_tech_flag=False) excludes 'is_<rats[1]>' -- it's such a dominant predictor
+    (2026-07-28 finding) that both models leaned on it instead of genuinely reasoning from
+    radio-condition features, collapsing the RAT-selection recommender to a constant "always
+    recommend <rats[1]>" output. include_tech_flag=True keeps it, for the legacy/comparison mode."""
     excluded = NON_FEATURE_COLS | LEAKY_COLS | {LOAD_COL, LABEL_COL}
+    if not include_tech_flag:
+        excluded = excluded | {"is_" + rats[1]}
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     return [c for c in numeric_cols if c not in excluded]
 

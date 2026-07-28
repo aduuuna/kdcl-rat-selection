@@ -44,12 +44,18 @@ def get_args():
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--n_classes", type=int, default=N_LOAD_CLASSES,
                          help="quantile bins for the load label -- more classes = harder task")
+    parser.add_argument("--include_tech_flag", action="store_true",
+                         help=f"keep 'is_{RATS[1]}' as a feature -- legacy/comparison mode only. "
+                              f"Excluded by default: it's such a dominant predictor that both "
+                              f"branches lean on it instead of the 15 genuine radio-condition "
+                              f"features, which collapses the RAT-selection recommender to always "
+                              f"recommending {RATS[1]}.")
     return parser.parse_args()
 
 
 def build_loaders(args):
     df = load_raw()
-    feature_cols = numeric_feature_columns(df)
+    feature_cols = numeric_feature_columns(df, include_tech_flag=args.include_tech_flag)
     df[LABEL_COL] = make_load_label(df, load_col=LOAD_COL, n_classes=args.n_classes)
     train_df, val_df, _ = time_blocked_split(df, order_cols=("time_utc",))
     scaler = fit_scaler(train_df, feature_cols)
@@ -139,7 +145,8 @@ def main():
     args = get_args()
     torch.manual_seed(args.seed)
 
-    exp_name = f"netztest_{args.mode}_{'_'.join(args.model_names)}"
+    suffix = "_withtechflag" if args.include_tech_flag else ""  # excluding the flag is the default now
+    exp_name = f"netztest_{args.mode}{suffix}"
     exp_path = os.path.join("experiments", exp_name, datetime.now().strftime("%Y-%m-%d-%H-%M"))
     os.makedirs(exp_path, exist_ok=True)
     log_path = os.path.join(exp_path, "train_log.txt")

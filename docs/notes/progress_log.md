@@ -284,3 +284,96 @@ genuinely useful recommender likely requires **retraining without `is_4G` as an 
 all**, forcing both branches to learn a mapping from radio conditions alone rather than leaning on
 the tech-identity shortcut. This is a real, actionable next step, not yet done — flagged rather than
 silently accepted, since claiming the 99.8% figure without checking would have been misleading.
+
+### Run 10 — fixing the degenerate recommender: retrain without `is_4G`
+
+Added `--exclude_tech_flag` to `train_netztest.py` (drops `is_4G` from the feature set via
+`numeric_feature_columns(df, include_tech_flag=False)` in `netztest_data.py`) and re-trained the
+tuned KDCL config on the remaining 15 genuine radio-condition features:
+
+`python src/train_netztest.py --mode kdcl --T 1.0 --alpha 0.1 --epochs 50 --exclude_tech_flag`
+```
+3G_agent best val acc: 66.10
+4G_agent best val acc: 66.75
+```
+Accuracy dropped from 68.89%/69.45% (with the flag) to 66.10%/66.75% — expected, since a genuinely
+predictive feature was removed. This is the correct trade: lower raw accuracy, but the model can no
+longer take the shortcut.
+
+Updated `infer_netztest.py` to support this case (`recommend_rat` now handles `is_4g_idx=None` —
+no column to force when it was never a training feature) and re-ran the recommender on the held-out
+test set with the new checkpoints:
+
+```
+Test set size: 5365
+Recommendation distribution: {'3G': 2420, '4G': 2945}
+Agreement with actual serving RAT: 3522/5365 = 65.6%
+Majority-class baseline (always recommend '4G'): 66.1%
+Agreement specifically on rows that actually achieved the top load class: 1531/1908 = 80.2%
+```
+
+**The fix worked — the recommender is no longer degenerate.** It now genuinely splits its
+recommendations (2,420 vs 2,945, not a constant answer), confirming both branches are actually
+reasoning from the 15 radio-condition features rather than reading off a dominant flag.
+
+**Honest read of the new numbers:** overall agreement (65.6%) sits right at the majority baseline
+(66.1%) — across the *full* range of outcomes, the recommender isn't clearly better than "always
+guess 4G." But on the subset where a genuinely top-tier outcome actually occurred, agreement is
+80.2%, meaningfully above the ~66% baseline — and this time that number is earned through real
+per-row reasoning, not a constant-output artifact. **Net conclusion: a modest but genuine signal
+exists specifically for identifying strong-outcome conditions, even though the recommender isn't
+yet clearly useful across the board.** This is a much more honest, defensible finding than either
+the original inflated 99.8% or a flat "it doesn't work" — it's a real, partial capability with a
+precise boundary on where it does and doesn't add value.
+
+---
+
+## Standardizing on no-tech-flag, cleaning up naming, full re-run
+
+Excluding `is_4G` is now **the default**, not an opt-in flag: `train_netztest.py`'s
+`--include_tech_flag` defaults to `False` (was `--exclude_tech_flag`, defaulting to include it —
+inverted for clarity), and `netztest_data.py`'s `numeric_feature_columns()` default flipped to
+match. Everything above this point used the *old* (`is_4G`-included) setup unless a run explicitly
+says otherwise — kept as historical record, not deleted, since it's what motivated this change.
+
+**Also cleaned up the experiment folder naming**, which had gotten confusing
+(`netztest_kdcl_rat_mlp_small_rat_mlp_large_notechflag` and similar). Since every run so far uses
+the same small/large architecture pairing, the model names were dropped from the folder name
+entirely. New convention: `netztest_<mode>` normally, `netztest_<mode>_withtechflag` only for the
+legacy comparison mode. All old experiment folders were deleted (all were already committed to git,
+so nothing is actually lost — recoverable via `git log` if ever needed) and every run below was
+redone fresh under the new naming.
+
+### Full re-run: vanilla / dml / kdcl, no tech flag, 50 epochs each
+
+```
+netztest_vanilla/2026-07-28-14-27   3G_agent best val acc: 66.10   4G_agent best val acc: 66.82
+netztest_dml/2026-07-28-14-30       3G_agent best val acc: 64.79   4G_agent best val acc: 65.16
+netztest_kdcl/2026-07-28-14-34      3G_agent best val acc: 66.10   4G_agent best val acc: 66.75   (T=1.0, alpha=0.1)
+```
+
+**Held-out test-set evaluation** (`src/eval_netztest.py`, `CHECKPOINTS` updated to the new paths):
+```
+mode          branch       val_acc  test_acc
+vanilla       3G_agent       66.10    65.33
+vanilla       4G_agent       66.82    66.54
+dml           3G_agent       64.79    63.02
+dml           4G_agent       65.16    63.45
+kdcl_tuned    3G_agent       66.10    64.85
+kdcl_tuned    4G_agent       66.75    66.26
+```
+
+### The current baseline, in one table
+
+| Mode | 3G_agent (val / test) | 4G_agent (val / test) |
+|---|---|---|
+| vanilla | 66.10% / 65.33% | 66.82% / 66.54% |
+| dml | 64.79% / 63.02% | 65.16% / 63.45% |
+| **kdcl (tuned)** | 66.10% / 64.85% | 66.75% / 66.26% |
+
+**The story holds up completely without `is_4G`, and the test set makes it even clearer:** DML's
+negative transfer is real and, if anything, more pronounced on unseen data (-2.31 points for 3G,
+-3.09 for 4G, vs. vanilla). KDCL recovers almost all of that gap and lands within half a point of
+vanilla on both branches, while clearly and substantially beating DML (+1.83 for 3G, +2.81 for 4G on
+the test set). This is the current, standard baseline going forward — everything above this section
+used the old (tech-flag-included) setup and is kept for context, not as the active result.

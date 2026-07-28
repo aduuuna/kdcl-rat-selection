@@ -14,18 +14,31 @@ research (now superseded — see git history if that phase is ever needed again)
       settled on `download_kbit` (quantile-binned, 3 classes) as the label.
 - [x] Built `src/netztest_data.py` + `src/train_netztest.py`, reusing the generic pipeline pieces
       from `data.py` (`MultiViewDataset`, `fit_scaler`, `time_blocked_split`, `make_load_label`).
-- [x] Ran vanilla / DML / KDCL(default) / KDCL(tuned) comparison, 50 epochs each:
+- [x] Ran vanilla / DML / KDCL(default) / KDCL(tuned) comparison, 50 epochs each, **with `is_4G`
+      included as a feature** — see below, this setup has since been superseded.
+- [x] **Standardized on excluding `is_4G` from the feature set** (see item 2 below for why —
+      it made the RAT-selection recommender degenerate). This is now the default in
+      `train_netztest.py` (`--include_tech_flag` opts back into the old behavior). Full comparison
+      re-run under this standard:
 
-  | Mode | 3G_agent | 4G_agent |
+  | Mode | 3G_agent (val / test) | 4G_agent (val / test) |
   |---|---|---|
-  | vanilla | 69.00% | **69.51%** |
-  | dml | 67.90% | 68.15% |
-  | kdcl (T=1.0, alpha=0.1–0.2, tuned) | 68.89% | 69.45% |
+  | vanilla | 66.10% / 65.33% | 66.82% / 66.54% |
+  | dml | 64.79% / 63.02% | 65.16% / 63.45% |
+  | **kdcl (T=1.0, alpha=0.1, tuned)** | 66.10% / 64.85% | 66.75% / 66.26% |
 
-  DML shows real (if modest) negative transfer; KDCL recovers nearly all of it, landing within noise
-  of vanilla for the stronger 4G model. The clearest result either dataset has produced.
+  DML shows real negative transfer, more pronounced on the held-out test set than on validation
+  (-2.31/-3.09 points vs. vanilla). KDCL recovers almost all of it and lands within half a point of
+  vanilla on both branches, while clearly beating DML (+1.83/+2.81 on test). This is the current
+  standard baseline — see `docs/notes/progress_log.md`'s "Standardizing on no-tech-flag" section for
+  the full re-run detail and why the earlier (`is_4G`-included) numbers were superseded.
 
-## Next — the two things asked for now
+- [x] **Cleaned up experiment folder naming** — was `netztest_<mode>_rat_mlp_small_rat_mlp_large`
+      (verbose, model names always the same so redundant); now `netztest_<mode>` (or
+      `netztest_<mode>_withtechflag` for the legacy comparison mode). All old folders deleted
+      (already committed to git, so nothing lost) and every run redone fresh under the new names.
+
+## Next — the two things asked for previously (done, now under the old tech-flag setup — see above for current numbers)
 
 ### 1. Held-out test-set evaluation — DONE
 - [x] `src/eval_netztest.py` written: loads saved checkpoints, evaluates on `test_df`, reports
@@ -34,22 +47,24 @@ research (now superseded — see git history if that phase is ever needed again)
       past vanilla for both branches (3G: 67.66% vs 67.47%; 4G: 68.42% vs 68.37%). See
       `progress_log.md` Run 8 for the full table.
 
-### 2. RAT-selection inference stage — BUILT, found a deeper problem than expected
+### 2. RAT-selection inference stage — DONE
 - [x] `src/infer_netztest.py` written, confound fix applied from day one (forces `is_4G` to each
       branch's own native value before scoring — see `build_explanation.md`).
-- [x] Evaluated on the held-out test split with a majority-class baseline. **Result: the
-      recommender is degenerate — it recommends "4G" for 100% of test rows.** The 66.1%/99.8%
-      headline numbers are mechanical artifacts of that, not real reasoning (see `progress_log.md`
-      Run 9 for the full diagnosis).
-- [ ] **New follow-up, not yet done:** retrain both branches with `is_4G` *excluded* from the
-      feature set, forcing them to learn from the 15 genuine radio-condition features alone, then
-      rebuild the recommender on top of those. This is the actual fix, not just a documented
-      limitation — worth doing before concluding the recommendation stage doesn't work at all.
+- [x] Evaluated on the held-out test split with a majority-class baseline. First result: the
+      recommender was degenerate — recommended "4G" for 100% of test rows (66.1%/99.8% headline
+      numbers were mechanical artifacts, not real reasoning).
+- [x] **Fixed**: added `--exclude_tech_flag` to `train_netztest.py`, retrained without `is_4G` as a
+      feature, forcing both branches to reason from the 15 genuine radio-condition features alone.
+      Recommender is no longer degenerate (splits 2,420 vs 2,945 across the test set). Honest
+      result: overall agreement (65.6%) sits at the majority baseline, but agreement specifically on
+      rows that achieved a genuinely top-tier outcome is 80.2% — meaningfully above baseline, and
+      earned through real per-row reasoning this time. See `progress_log.md` Run 10.
 
 ## Also outstanding (lower priority, not blocking the two above)
 
 - [ ] Repeated-seed runs — everything so far is a single seed; the tuned-KDCL-vs-vanilla gap
-      (0.06 points) is within plausible run-to-run noise and shouldn't be over-claimed without this.
+      (under half a point on both branches, current baseline) is within plausible run-to-run noise
+      and shouldn't be over-claimed without this.
 - [ ] Try `KDCL-Linear` (`src/kdcl.py`'s `linear()`) as an alternative to MinLogit — implemented,
       never actually tried on either dataset.
 - [ ] ICL ablation (`--distortions none none`) and the noise-robustness test — worth doing properly

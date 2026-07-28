@@ -12,14 +12,11 @@ from utils import accuracy
 
 BRANCH_MODEL_NAMES = {"3G_agent": "rat_mlp_small", "4G_agent": "rat_mlp_large"}
 
-# One representative run per mode -- see plan.md / progress_log.md for why these were picked
-# (dml/kdcl-default use the CIFAR-inherited T=2.0/alpha=0.5; kdcl-tuned uses T=1.0/alpha=0.1,
-# the best result from the sweep).
+# Current baseline (no tech flag -- default since 2026-07-28). See plan.md / progress_log.md.
 CHECKPOINTS = {
-    "vanilla": "experiments/netztest_vanilla_rat_mlp_small_rat_mlp_large/2026-07-28-07-20",
-    "dml": "experiments/netztest_dml_rat_mlp_small_rat_mlp_large/2026-07-28-07-26",
-    "kdcl_default": "experiments/netztest_kdcl_rat_mlp_small_rat_mlp_large/2026-07-28-07-38",
-    "kdcl_tuned": "experiments/netztest_kdcl_rat_mlp_small_rat_mlp_large/2026-07-28-08-05",
+    "vanilla": "experiments/netztest_vanilla/2026-07-28-14-27",
+    "dml": "experiments/netztest_dml/2026-07-28-14-30",
+    "kdcl_tuned": "experiments/netztest_kdcl/2026-07-28-14-34",  # T=1.0, alpha=0.1
 }
 
 
@@ -33,7 +30,7 @@ def load_checkpoint(ckpt_dir, branch, in_dim, n_classes=3):
 
 def main():
     df = load_raw()
-    feature_cols = numeric_feature_columns(df)
+    feature_cols = numeric_feature_columns(df, include_tech_flag=False)  # matches how CHECKPOINTS were trained
     df[LABEL_COL] = make_load_label(df, load_col=LOAD_COL, n_classes=3)
     train_df, val_df, test_df = time_blocked_split(df, order_cols=("time_utc",))
     scaler = fit_scaler(train_df, feature_cols)
