@@ -1,0 +1,14 @@
+Experiment: experiments\netztest_kdcl_rat_mlp_small_rat_mlp_large\2026-07-28-07-54 (mode=kdcl, ensemble=minlogit)
+args: {'mode': 'kdcl', 'ensemble': 'minlogit', 'model_names': ['rat_mlp_small', 'rat_mlp_large'], 'distortions': ['awgn', 'fading'], 'T': 1.0, 'alpha': 0.2, 'batch_size': 64, 'epochs': 50, 'lr': 0.001, 'weight_decay': 0.0001, 'milestones': [30, 40], 'gamma': 0.1, 'seed': 1, 'print_freq': 10, 'num_workers': 0, 'n_classes': 3}
+[10] 3G_agent: train_loss=0.595 train_acc=64.66 val_loss=0.714 val_acc=66.41
+[10] 4G_agent: train_loss=0.587 train_acc=65.44 val_loss=0.701 val_acc=67.62
+[20] 3G_agent: train_loss=0.586 train_acc=65.16 val_loss=0.701 val_acc=67.92
+[20] 4G_agent: train_loss=0.578 train_acc=65.90 val_loss=0.695 val_acc=68.44
+[30] 3G_agent: train_loss=0.578 train_acc=65.90 val_loss=0.697 val_acc=68.24
+[30] 4G_agent: train_loss=0.572 train_acc=66.14 val_loss=0.693 val_acc=69.00
+[40] 3G_agent: train_loss=0.576 train_acc=66.35 val_loss=0.695 val_acc=68.41
+[40] 4G_agent: train_loss=0.572 train_acc=66.70 val_loss=0.692 val_acc=68.89
+[50] 3G_agent: train_loss=0.576 train_acc=66.19 val_loss=0.696 val_acc=68.61
+[50] 4G_agent: train_loss=0.573 train_acc=66.28 val_loss=0.694 val_acc=69.23
+3G_agent best val acc: 68.78
+4G_agent best val acc: 69.45

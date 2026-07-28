@@ -6,4 +6,8 @@ env/
 .ipynb_checkpoints/
 data/processed/*
 !data/processed/.gitkeep
+data/raw/netztest-opendata-*.csv
+data/raw/rtr_monthly/
+extradatasets/*
+!extradatasets/README.md
 .DS_Store
