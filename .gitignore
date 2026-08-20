@@ -11,3 +11,6 @@ data/raw/rtr_monthly/
 extradatasets/*
 !extradatasets/README.md
 .DS_Store
+data/raw/*
+
+
