@@ -8,6 +8,7 @@ independently; `recommend_rat` overrides it to each branch's own native value be
 that case.
 """
 import argparse
+import os
 
 import torch
 import torch.nn.functional as F
@@ -104,16 +105,27 @@ def main():
 
     majority_rat = test_df["cat_technology"].value_counts(normalize=True).idxmax()
     majority_baseline = test_df["cat_technology"].value_counts(normalize=True).max()
+    high_load_agreement = high_load_agree / high_load_rows if high_load_rows else None
 
-    print(f"\nTest set size: {n}")
-    print(f"Recommendation distribution: {recommended_counts} "
-          f"(a degenerate/constant recommender would show one value at ~{n})")
-    print(f"Agreement with actual serving RAT: {agree}/{n} = {agree/n:.1%} (proxy measure only)")
-    print(f"Majority-class baseline (always recommend '{majority_rat}'): {majority_baseline:.1%} "
-          f"-- agreement above this bar is informative, at/below it is not")
+    summary_lines = [
+        f"Test set size: {n}",
+        f"Recommendation distribution: {recommended_counts} "
+        f"(a degenerate/constant recommender would show one value at ~{n})",
+        f"Agreement with actual serving RAT: {agree}/{n} = {agree/n:.1%} (proxy measure only)",
+        f"Majority-class baseline (always recommend '{majority_rat}'): {majority_baseline:.1%} "
+        f"-- agreement above this bar is informative, at/below it is not",
+    ]
     if high_load_rows:
-        print(f"Agreement specifically on rows that actually achieved the top load class: "
-              f"{high_load_agree}/{high_load_rows} = {high_load_agree/high_load_rows:.1%}")
+        summary_lines.append(
+            f"Agreement specifically on rows that actually achieved the top load class: "
+            f"{high_load_agree}/{high_load_rows} = {high_load_agreement:.1%}"
+        )
+    print("\n" + "\n".join(summary_lines))
+
+    os.makedirs("results", exist_ok=True)
+    with open(os.path.join("results", "recommender_summary.txt"), "w") as f:
+        f.write("\n".join(summary_lines) + "\n")
+    print("\nSaved results/recommender_summary.txt")
 
 
 if __name__ == "__main__":

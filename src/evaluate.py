@@ -1,12 +1,21 @@
 """Final, unbiased evaluation on the held-out TEST split. Auto-discovers every timestamped run
 folder under experiments/netztest_<mode>/ and reports mean +/- std across seeds/runs when more
 than one exists per mode -- this is what answers "is the KDCL-vs-vanilla gap stable across seeds"
-(Objective 1) and gives a single comparison table across all methods (Objective 2)."""
+(Objective 1) and gives a single comparison table across all methods (Objective 2).
+
+Unlike earlier versions of this script, results are now written to results/summary.csv and
+results/summary.json every time this runs, not just printed -- printed output disappears the
+moment the terminal closes, which isn't good enough to call something "proof" for a thesis.
+A two-sample t-test (KDCL-MinLogit vs Vanilla, KDCL-MinLogit vs DML, per branch) is also computed
+and saved to results/significance.csv, per the significance-testing step in the methodology.
+"""
 import glob
+import json
 import os
 import statistics as stats
 
 import torch
+from scipy import stats as sp_stats
 
 from rat_dataset import (
     load_raw, make_load_label, numeric_feature_columns, time_blocked_split, LABEL_COL, LOAD_COL, RATS,
@@ -16,6 +25,7 @@ from models import build_model
 from utils import accuracy
 
 BRANCH_NAMES = (f"{RATS[0]}_agent", f"{RATS[1]}_agent")
+RESULTS_DIR = "results"
 
 # experiment-folder prefix -> {branch_folder_name: model_arch_name}
 # offline_kd only ever produces the student branch (BRANCH_NAMES[0]).
@@ -39,6 +49,32 @@ def load_checkpoint(ckpt_dir, branch, arch, in_dim, n_classes=3):
     model.load_state_dict(state["model"])
     model.eval()
     return model
+
+
+def significance_tests(rows):
+    """Independent two-sample t-test on per-seed TEST accuracies, KDCL-MinLogit vs Vanilla and
+    KDCL-MinLogit vs DML, one test per branch. Needs >=2 seeds on both sides to mean anything."""
+    by_key = {(r["mode"], r["branch"]): r for r in rows}
+    out = []
+    for branch in BRANCH_NAMES:
+        kdcl_row = by_key.get(("netztest_kdcl", branch))
+        if kdcl_row is None:
+            continue
+        for baseline_mode in ("netztest_vanilla", "netztest_dml"):
+            base_row = by_key.get((baseline_mode, branch))
+            if base_row is None:
+                continue
+            a, b = kdcl_row["test_accs"], base_row["test_accs"]
+            if len(a) < 2 or len(b) < 2:
+                out.append({"branch": branch, "comparison": f"kdcl_vs_{baseline_mode}",
+                            "n_a": len(a), "n_b": len(b), "t_stat": None, "p_value": None,
+                            "note": "need >=2 seeds on both sides for a t-test"})
+                continue
+            t_stat, p_value = sp_stats.ttest_ind(a, b)
+            out.append({"branch": branch, "comparison": f"kdcl_vs_{baseline_mode}",
+                         "n_a": len(a), "n_b": len(b), "t_stat": float(t_stat), "p_value": float(p_value),
+                         "significant_at_0.05": bool(p_value < 0.05)})
+    return out
 
 
 def main():
@@ -83,6 +119,34 @@ def main():
                          "val_acc_mean": v_mean, "val_acc_std": v_std,
                          "test_acc_mean": t_mean, "test_acc_std": t_std,
                          "val_accs": val_accs, "test_accs": test_accs})
+
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    with open(os.path.join(RESULTS_DIR, "summary.json"), "w") as f:
+        json.dump(rows, f, indent=2)
+    with open(os.path.join(RESULTS_DIR, "summary.csv"), "w") as f:
+        f.write("mode,branch,n_runs,val_acc_mean,val_acc_std,test_acc_mean,test_acc_std,val_accs,test_accs\n")
+        for r in rows:
+            f.write(f"{r['mode']},{r['branch']},{r['n_runs']},{r['val_acc_mean']:.4f},{r['val_acc_std']:.4f},"
+                     f"{r['test_acc_mean']:.4f},{r['test_acc_std']:.4f},"
+                     f"\"{r['val_accs']}\",\"{r['test_accs']}\"\n")
+    print(f"\nSaved {os.path.join(RESULTS_DIR, 'summary.json')} and "
+          f"{os.path.join(RESULTS_DIR, 'summary.csv')} ({len(rows)} rows).")
+
+    sig = significance_tests(rows)
+    if sig:
+        with open(os.path.join(RESULTS_DIR, "significance.csv"), "w") as f:
+            f.write("branch,comparison,n_a,n_b,t_stat,p_value,significant_at_0.05\n")
+            for s in sig:
+                f.write(f"{s['branch']},{s['comparison']},{s['n_a']},{s['n_b']},"
+                         f"{s.get('t_stat')},{s.get('p_value')},{s.get('significant_at_0.05')}\n")
+        print(f"Saved {os.path.join(RESULTS_DIR, 'significance.csv')}:")
+        for s in sig:
+            if s.get("p_value") is not None:
+                print(f"  {s['branch']} {s['comparison']}: t={s['t_stat']:.3f} p={s['p_value']:.4f} "
+                      f"({'significant' if s['significant_at_0.05'] else 'not significant'} at 0.05)")
+            else:
+                print(f"  {s['branch']} {s['comparison']}: {s['note']}")
+
     return rows
 
 

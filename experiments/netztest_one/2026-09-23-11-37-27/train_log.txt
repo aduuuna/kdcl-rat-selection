@@ -1,2 +1,7 @@
 Experiment: experiments\netztest_one\2026-09-23-11-37-27 (mode=one, ensemble=minlogit, seed=1)
 args: {'mode': 'one', 'ensemble': 'minlogit', 'model_names': ['rat_mlp_small', 'rat_mlp_large'], 'distortions': ['awgn', 'fading'], 'T': 2.0, 'alpha': 0.5, 'batch_size': 512, 'epochs': 50, 'lr': 0.001, 'weight_decay': 0.0001, 'milestones': [30, 40], 'gamma': 0.1, 'seed': 1, 'print_freq': 50, 'num_workers': 0, 'n_classes': 3, 'include_tech_flag': False, 'gate_hidden': 32, 'gate_lr': 0.001, 'teacher_ckpt': None}
+[50] 4G_agent: train_loss=0.477 train_acc=52.53 val_loss=0.969 val_acc=53.48
+[50] 5G_agent: train_loss=0.468 train_acc=52.96 val_loss=0.962 val_acc=51.90
+[50] gate: train_acc=53.62
+4G_agent best val acc: 53.87
+5G_agent best val acc: 52.51

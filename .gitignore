@@ -14,9 +14,6 @@ data/raw/
 docs/notes/
 docs/Thesis Draft.pdf
 
-# Generated notebook output, rebuildable from experiments/ + evaluate.py
-results/
-
 # OS / editor cruft
 .DS_Store
 .vscode/

@@ -1,0 +1,5 @@
+branch,comparison,n_a,n_b,t_stat,p_value,significant_at_0.05
+4G_agent,kdcl_vs_netztest_vanilla,3,3,0.5094940310791876,0.6372279847068666,False
+4G_agent,kdcl_vs_netztest_dml,3,3,10.42848846001339,0.0004776407887083635,True
+5G_agent,kdcl_vs_netztest_vanilla,3,3,-0.4602519461676703,0.6692431952618161,False
+5G_agent,kdcl_vs_netztest_dml,3,3,20.290267972360937,3.483373375089493e-05,True
