@@ -1,0 +1,6 @@
+Experiment: experiments\netztest_vanilla\2026-09-23-10-29-00 (mode=vanilla, ensemble=minlogit, seed=2)
+args: {'mode': 'vanilla', 'ensemble': 'minlogit', 'model_names': ['rat_mlp_small', 'rat_mlp_large'], 'distortions': ['awgn', 'fading'], 'T': 2.0, 'alpha': 0.5, 'batch_size': 512, 'epochs': 50, 'lr': 0.001, 'weight_decay': 0.0001, 'milestones': [30, 40], 'gamma': 0.1, 'seed': 2, 'print_freq': 50, 'num_workers': 0, 'n_classes': 3, 'include_tech_flag': False, 'gate_hidden': 32, 'gate_lr': 0.001, 'teacher_ckpt': None}
+[50] 4G_agent: train_loss=0.923 train_acc=53.73 val_loss=0.944 val_acc=54.81
+[50] 5G_agent: train_loss=0.916 train_acc=53.97 val_loss=0.933 val_acc=54.30
+4G_agent best val acc: 55.07
+5G_agent best val acc: 54.79

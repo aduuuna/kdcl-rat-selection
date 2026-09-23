@@ -1,0 +1,6 @@
+Experiment: experiments\netztest_kdcl_linear\2026-09-23-11-25-54 (mode=kdcl, ensemble=linear, seed=3)
+args: {'mode': 'kdcl', 'ensemble': 'linear', 'model_names': ['rat_mlp_small', 'rat_mlp_large'], 'distortions': ['awgn', 'fading'], 'T': 1.0, 'alpha': 0.1, 'batch_size': 512, 'epochs': 50, 'lr': 0.001, 'weight_decay': 0.0001, 'milestones': [30, 40], 'gamma': 0.1, 'seed': 3, 'print_freq': 50, 'num_workers': 0, 'n_classes': 3, 'include_tech_flag': False, 'gate_hidden': 32, 'gate_lr': 0.001, 'teacher_ckpt': None}
+[50] 4G_agent: train_loss=0.835 train_acc=53.46 val_loss=0.945 val_acc=54.88
+[50] 5G_agent: train_loss=0.826 train_acc=54.01 val_loss=0.931 val_acc=55.04
+4G_agent best val acc: 54.88
+5G_agent best val acc: 55.10

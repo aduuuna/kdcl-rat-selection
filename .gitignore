@@ -4,13 +4,20 @@ __pycache__/
 venv/
 env/
 .ipynb_checkpoints/
-data/processed/*
-!data/processed/.gitkeep
-data/raw/netztest-opendata-*.csv
-data/raw/rtr_monthly/
-extradatasets/*
-!extradatasets/README.md
+
+# Datasets. The full RTR-NetzTest dump is 12.6GB and was never meant to be pushed; the trimmed
+# training file (~25MB) lives under data/raw/ locally and is shared separately (see README).
+data/*.csv
+data/raw/
+
+# Working notes and the in-progress thesis draft. Not ready for public viewing yet.
+docs/notes/
+docs/Thesis Draft.pdf
+
+# Generated notebook output, rebuildable from experiments/ + evaluate.py
+results/
+
+# OS / editor cruft
 .DS_Store
-data/raw/*
-
-
+.vscode/
+.idea/
