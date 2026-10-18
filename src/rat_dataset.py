@@ -5,9 +5,9 @@ rows, proper CSV-quote-aware parsing -- ~2.2% of rows have a quoted comma in 'mo
 naive comma-splitting) then stratified-subsampled via src/subsample_4g5g.py to ~200K rows,
 preserving the 4G:5G ratio and full Jan-2024-to-Dec-2025 time range per (tech, month) stratum.
 Verified capacity gap: mean download 4G 60,657 kbit vs 5G 230,536 kbit (~3.8x, larger than the
-original 3G/4G gap). Reuses the generic pieces from shared_data.py (MultiViewDataset,
-SingleViewDataset, fit_scaler, make_load_label, time_blocked_split) -- only the schema-specific
-loading/labeling/feature-selection logic is duplicated here.
+original 3G/4G gap). Reuses the generic pieces from shared_data.py (SingleViewDataset, fit_scaler,
+make_load_label, time_blocked_split) -- only the schema-specific loading/labeling/feature-selection
+logic is duplicated here.
 """
 import os
 
@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from shared_data import (  # noqa: F401 -- re-exported for callers
-    MultiViewDataset, SingleViewDataset, fit_scaler, make_load_label, time_blocked_split,
+    SingleViewDataset, fit_scaler, make_load_label, time_blocked_split,
 )
 
 # Override via env var so the same code works unmodified on Colab (e.g. a Drive-mounted path)

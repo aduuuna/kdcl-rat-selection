@@ -14,7 +14,14 @@ data/raw/
 docs/notes/
 docs/Thesis Draft.pdf
 
+# A copyrighted Elsevier journal pre-proof the supervisor shared as a formatting reference --
+# someone else's article, not ours to redistribute.
+docs/SUPERVISORS TEMPLATE.pdf
+
 # OS / editor cruft
 .DS_Store
 .vscode/
 .idea/
+
+# Office lock files (created while a .pptx/.docx/.xlsx is open; junk, regenerated automatically)
+~$*

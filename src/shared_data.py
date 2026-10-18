@@ -1,43 +1,19 @@
-"""Tabular data pipeline: loads the dataset, builds the load-class label, and provides a shared
-dataset where both RAT branches see the same row (see MultiViewDataset)."""
+"""Generic, dataset-agnostic tabular utilities shared across this project's pipeline. Originally
+part of a much larger file written for an earlier, abandoned phase of this project (a different,
+unrelated dataset), trimmed 2026-09-23 to just the pieces still genuinely imported by rat_dataset.py,
+train.py, evaluate.py, robustness.py, and recommend.py. Nothing here assumes any particular column
+names or RAT pair, that's rat_dataset.py's job.
+"""
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-RAW_XLSX = "data/raw/urban_dataset_processed.xlsx"
 
-# ID/timestamp columns -- not radio-state features.
-NON_FEATURE_COLS = {
-    "Timestamp", "Node", "CellID", "LAC", "NetworkTech", "State", "Test_Status",
-    "Mobility", "SessionID", "PSC", "ARFCN", "SecondCell_NODE", "SecondCell_CELLID",
-    "SecondCell_PSC", "SecondCell_ARFCN", "NTech1", "NCellid1", "NLAC1", "NCell1",
-    "NARFCN1", "Operatorname", "time_seconds",
-}
-
-# Correlate 0.79 / 0.66 with derived_load and are almost certainly its components
-# (confirmed 2026-07-16 EDA) -- excluded to avoid predicting the label from its own ingredients.
-LEAKY_COLS = {"temp_load", "sig_load"}
-
-LOAD_COL = "derived_load"
-LABEL_COL = "load_class"
-N_LOAD_CLASSES = 3  # Low / Medium / High, quantile-based
-
-
-def load_raw(path: str = RAW_XLSX) -> pd.DataFrame:
-    df = pd.read_excel(path, engine="openpyxl")
-    df["is_5G"] = (df["NetworkTech"] == "5G").astype(np.float32)
-    return df
-
-
-def make_load_label(df: pd.DataFrame, load_col: str = LOAD_COL, n_classes: int = N_LOAD_CLASSES) -> pd.Series:
+def make_load_label(df: pd.DataFrame, load_col: str, n_classes: int) -> pd.Series:
+    """Quantile-based binning (each bin gets roughly equal row count), not fixed-width, since raw
+    throughput is heavily skewed."""
     return pd.qcut(df[load_col], q=n_classes, labels=False, duplicates="drop")
-
-
-def numeric_feature_columns(df: pd.DataFrame) -> list:
-    excluded = NON_FEATURE_COLS | LEAKY_COLS | {LOAD_COL, LABEL_COL}
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    return [c for c in numeric_cols if c not in excluded]
 
 
 def fit_scaler(df: pd.DataFrame, feature_cols: list):
@@ -51,14 +27,10 @@ def fit_scaler(df: pd.DataFrame, feature_cols: list):
     return mean, std
 
 
-def split_by_rat(df: pd.DataFrame) -> dict:
-    """EDA only -- not used for training splits, both branches train on the full dataset."""
-    return {rat: df[df["NetworkTech"] == rat].reset_index(drop=True) for rat in ("4G", "5G")}
-
-
-def time_blocked_split(df: pd.DataFrame, val_frac: float = 0.15, test_frac: float = 0.15,
-                        order_cols=("SessionID", "ElapsedTime")):
-    """Sequential split, not random shuffle -- wireless data is temporally correlated."""
+def time_blocked_split(df: pd.DataFrame, order_cols: tuple, val_frac: float = 0.15, test_frac: float = 0.15):
+    """Sequential split, not random shuffle -- wireless data is temporally correlated, so a random
+    split would leak future-period information into training. order_cols has no default; every
+    caller in this project passes ("time_utc",) explicitly."""
     df_sorted = df.sort_values(list(order_cols)).reset_index(drop=True)
     n = len(df_sorted)
     n_test = int(n * test_frac)
@@ -69,29 +41,9 @@ def time_blocked_split(df: pd.DataFrame, val_frac: float = 0.15, test_frac: floa
     return train_df, val_df, test_df
 
 
-class MultiViewDataset(Dataset):
-    """Each branch gets the same row through its own distortion, so one shared teacher logit is valid."""
-
-    def __init__(self, df: pd.DataFrame, feature_cols: list, label: pd.Series, distortions: list, scaler=None):
-        features = df[feature_cols].fillna(0.0).to_numpy(dtype=np.float32)
-        if scaler is not None:
-            mean, std = scaler
-            features = (features - mean) / std
-        self.features = features
-        self.labels = label.to_numpy(dtype=np.int64)
-        self.distortions = distortions
-
-    def __len__(self):
-        return len(self.labels)
-
-    def __getitem__(self, idx):
-        base = self.features[idx]
-        views = np.stack([d(base.copy()) for d in self.distortions])
-        return torch.from_numpy(views), int(self.labels[idx])
-
-
 class SingleViewDataset(Dataset):
-    """No distortion -- used for validation/inference."""
+    """No distortion -- used for validation, testing, and inference, where you want the real,
+    undistorted signal rather than a training-time-only augmentation."""
 
     def __init__(self, df: pd.DataFrame, feature_cols: list, label: pd.Series = None, scaler=None):
         features = df[feature_cols].fillna(0.0).to_numpy(dtype=np.float32)
@@ -108,12 +60,3 @@ class SingleViewDataset(Dataset):
         x = torch.from_numpy(self.features[idx])
         y = int(self.labels[idx]) if self.labels is not None else -1
         return x, y
-
-
-if __name__ == "__main__":
-    df = load_raw()
-    print("feature columns:", len(numeric_feature_columns(df)))
-    df[LABEL_COL] = make_load_label(df)
-    print("overall", df.shape, "class balance:", df[LABEL_COL].value_counts(normalize=True).to_dict())
-    for rat, rat_df in split_by_rat(df).items():
-        print(rat, rat_df.shape, "class balance:", rat_df[LABEL_COL].value_counts(normalize=True).to_dict())
