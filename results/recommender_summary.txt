@@ -1,5 +1,30 @@
-Test set size: 500
-Recommendation distribution: {'4G': 255, '5G': 245} (a degenerate/constant recommender would show one value at ~500)
-Agreement with actual serving RAT: 278/500 = 55.6% (proxy measure only)
+RAT recommender, KDCL RAT (MinLogit), FULL held-out test split, one block per training seed.
+Generated 2026-10-22 by: python src/recommend.py --checkpoints <run>/4G_agent/best.pth <run>/5G_agent/best.pth
+(src/recommend.py rewrites this file with a single run each time it is called; the three outputs are collected here.)
+
+=== seed 1: experiments/netztest_kdcl/2026-09-23-10-56-30 ===
+Test set size: 29999
+Recommendation distribution: {'4G': 16323, '5G': 13676} (a degenerate/constant recommender would show one value at ~29999)
+Agreement with actual serving RAT: 17652/29999 = 58.8% (proxy measure only)
 Majority-class baseline (always recommend '5G'): 56.0% -- agreement above this bar is informative, at/below it is not
-Agreement specifically on rows that actually achieved the top load class: 112/168 = 66.7%
+Agreement specifically on rows that actually achieved the top load class: 7046/11366 = 62.0%
+
+=== seed 2: experiments/netztest_kdcl/2026-09-23-11-00-21 ===
+Test set size: 29999
+Recommendation distribution: {'4G': 9161, '5G': 20838} (a degenerate/constant recommender would show one value at ~29999)
+Agreement with actual serving RAT: 17980/29999 = 59.9% (proxy measure only)
+Majority-class baseline (always recommend '5G'): 56.0% -- agreement above this bar is informative, at/below it is not
+Agreement specifically on rows that actually achieved the top load class: 8265/11366 = 72.7%
+
+=== seed 3: experiments/netztest_kdcl/2026-09-23-11-03-55 ===
+Test set size: 29999
+Recommendation distribution: {'4G': 9367, '5G': 20632} (a degenerate/constant recommender would show one value at ~29999)
+Agreement with actual serving RAT: 18604/29999 = 62.0% (proxy measure only)
+Majority-class baseline (always recommend '5G'): 56.0% -- agreement above this bar is informative, at/below it is not
+Agreement specifically on rows that actually achieved the top load class: 8653/11366 = 76.1%
+
+=== across the 3 seeds (mean +/- population SD) ===
+Agreement with actual serving RAT: 60.26 +/- 1.32 %
+Top-load agreement:                70.28 +/- 6.02 %
+Share of rows recommended 4G:      38.72 +/- 11.10 %
+Actual test-set split:             4G 13,192 (44.0%) / 5G 16,807 (56.0%)
